@@ -529,6 +529,51 @@ body.cart-open {
     font-weight: 700;
 }
 
+.checkout-form {
+    display: grid;
+    gap: 9px;
+    margin-bottom: 14px;
+}
+
+.checkout-form label {
+    color: #795b47;
+    font-size: 14px;
+}
+
+.checkout-form input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #b89575;
+    border-radius: 6px;
+    background: #fffdf9;
+    color: #4b2e20;
+    font: inherit;
+}
+
+.checkout-form button {
+    width: 100%;
+    margin-top: 5px;
+    border: 0;
+    border-radius: 6px;
+    padding: 12px;
+    background: #5c3926;
+    color: white;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.checkout-form button:hover:not(:disabled) {
+    background: #754323;
+    transform: translateY(-1px);
+}
+
+.checkout-form button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
 .continue-shopping {
     width: 100%;
     border: 1px solid #5c3926;

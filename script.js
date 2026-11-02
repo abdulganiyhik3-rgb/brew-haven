@@ -59,12 +59,13 @@ cartDrawer.setAttribute("role", "dialog");
 cartDrawer.setAttribute("aria-modal", "true");
 cartDrawer.setAttribute("aria-hidden", "true");
 cartDrawer.inert = true;
-cartDrawer.innerHTML = '<div class="cart-header"><h2>Your cart</h2><button class="cart-close" type="button" aria-label="Close shopping cart">×</button></div><div class="cart-items" aria-live="polite"></div><div class="cart-footer"><div class="cart-subtotal"><span>Subtotal</span><strong></strong></div><div class="cart-total"><span>Total</span><strong></strong></div><button class="continue-shopping" type="button">Continue shopping</button></div>';
+cartDrawer.innerHTML = '<div class="cart-header"><h2>Your cart</h2><button class="cart-close" type="button" aria-label="Close shopping cart">×</button></div><div class="cart-items" aria-live="polite"></div><div class="cart-footer"><div class="cart-subtotal"><span>Subtotal</span><strong></strong></div><div class="cart-total"><span>Total</span><strong></strong></div><form class="checkout-form"><label for="checkout-name">Name</label><input id="checkout-name" name="customer_name" maxlength="100" autocomplete="name" required><label for="checkout-email">Email for your receipt</label><input id="checkout-email" name="customer_email" type="email" maxlength="254" autocomplete="email" required><button type="submit">Pay with Paystack</button></form><button class="continue-shopping" type="button">Continue shopping</button></div>';
 document.body.append(cartDrawer);
 
 const cartItems = cartDrawer.querySelector(".cart-items");
 const cartSubtotal = cartDrawer.querySelector(".cart-subtotal strong");
 const cartTotal = cartDrawer.querySelector(".cart-total strong");
+const checkoutForm = cartDrawer.querySelector(".checkout-form");
 
 function setCartOpen(open) {
   cartDrawer.classList.toggle("is-open", open);
@@ -179,6 +180,7 @@ function renderCart() {
   });
   cartSubtotal.textContent = money(subtotal);
   cartTotal.textContent = money(subtotal);
+  checkoutForm.querySelector('button[type="submit"]').disabled = cart.size === 0;
   updateCartButton();
   saveCart();
 }
@@ -203,6 +205,56 @@ cartItems.addEventListener("click", (event) => {
   if (button.dataset.action === "remove" || item.quantity <= 0) cart.delete(button.dataset.id);
   renderCart();
 });
+
+checkoutForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!cart.size) return;
+  const submitButton = checkoutForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    const result = await request("/api/payments/initialize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer_name: new FormData(checkoutForm).get("customer_name"),
+        customer_email: new FormData(checkoutForm).get("customer_email"),
+        items: [...cart.values()].map((item) => ({
+          product_id: Number(item.id),
+          quantity: item.quantity
+        }))
+      })
+    });
+    if (typeof result.authorization_url !== "string") {
+      throw new Error("Paystack did not return a payment link.");
+    }
+    window.location.assign(result.authorization_url);
+  } catch (error) {
+    showMessage(error.message);
+    submitButton.disabled = cart.size === 0;
+  }
+});
+
+async function handlePaymentCallback() {
+  const url = new URL(window.location.href);
+  const reference = url.searchParams.get("reference") || url.searchParams.get("trxref");
+  if (!reference) return;
+  try {
+    const result = await request(`/api/payments/verify?reference=${encodeURIComponent(reference)}`);
+    if (!result.paid) {
+      showMessage("Payment was not confirmed. Your cart is still saved.");
+      return;
+    }
+    cart.clear();
+    renderCart();
+    url.searchParams.delete("reference");
+    url.searchParams.delete("trxref");
+    url.searchParams.delete("payment");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    showMessage("Payment confirmed. Thank you for your order!");
+  } catch (error) {
+    showMessage(`We could not confirm your payment yet: ${error.message}`);
+  }
+}
 
 async function loadProducts() {
   try {
@@ -284,3 +336,4 @@ restoreCart();
 renderCart();
 loadProducts();
 loadPosts();
+handlePaymentCallback();

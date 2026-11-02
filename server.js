@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import express from "express";
 import { createClient } from "@supabase/supabase-js";
 
@@ -7,7 +7,12 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const statuses = ["new", "preparing", "ready", "completed", "cancelled"];
 
-app.use(express.json({ limit: "32kb" }));
+app.use(express.json({
+  limit: "32kb",
+  verify(request, response, buffer) {
+    request.rawBody = buffer;
+  }
+}));
 
 app.use((request, response, next) => {
   const origin = request.get("Origin");
@@ -56,6 +61,161 @@ function failOnError(result) {
   return result.data;
 }
 
+function getPaystackSecret() {
+  const key = process.env.PAYSTACK_SECRET_KEY;
+  if (!key || key.includes("your-paystack") || key.startsWith("replace-with-")) {
+    const error = new Error("Paystack is not configured. Set PAYSTACK_SECRET_KEY in the server .env file.");
+    error.status = 503;
+    throw error;
+  }
+  return key;
+}
+
+async function paystackRequest(path, body) {
+  const response = await fetch(`https://api.paystack.co${path}`, {
+    method: body ? "POST" : "GET",
+    headers: {
+      Authorization: `Bearer ${getPaystackSecret()}`,
+      ...(body ? { "Content-Type": "application/json" } : {})
+    },
+    ...(body ? { body: JSON.stringify(body) } : {})
+  });
+  const result = await response.json();
+  if (!response.ok || !result.status) {
+    const error = new Error(result.message || "Paystack could not complete the request.");
+    error.status = 502;
+    throw error;
+  }
+  return result.data;
+}
+
+async function verifyPaystackPayment(reference) {
+  const client = getSupabase();
+  const order = failOnError(await client.from("orders")
+    .select("id,total,payment_status,payment_reference")
+    .eq("payment_reference", reference)
+    .maybeSingle());
+  if (!order) {
+    const error = new Error("No order matches this payment reference.");
+    error.status = 404;
+    throw error;
+  }
+  if (order.payment_status === "paid") return { paid: true, orderId: order.id };
+
+  const transaction = await paystackRequest(`/transaction/verify/${encodeURIComponent(reference)}`);
+  const expectedAmount = Math.round(Number(order.total) * 100);
+  if (
+    transaction.status !== "success" ||
+    transaction.reference !== order.payment_reference ||
+    transaction.amount !== expectedAmount ||
+    transaction.currency !== "NGN"
+  ) {
+    return { paid: false, orderId: order.id };
+  }
+
+  failOnError(await client.from("orders")
+    .update({ payment_status: "paid" })
+    .eq("id", order.id)
+    .neq("payment_status", "paid"));
+  return { paid: true, orderId: order.id };
+}
+
+async function initializePayment(request, response) {
+  const { customer_name: customerName, customer_email: customerEmail, items } = request.body || {};
+  if (typeof customerName !== "string" || !customerName.trim() || customerName.length > 100) {
+    return response.status(400).json({ error: "Enter a customer name up to 100 characters." });
+  }
+  if (typeof customerEmail !== "string" || customerEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+    return response.status(400).json({ error: "Enter a valid email address." });
+  }
+  if (!Array.isArray(items) || items.length < 1 || items.length > 30) {
+    return response.status(400).json({ error: "Your cart must contain between 1 and 30 products." });
+  }
+
+  const requested = new Map();
+  for (const item of items) {
+    if (!item || typeof item !== "object" || !Number.isInteger(item.product_id) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 50) {
+      return response.status(400).json({ error: "A cart item is invalid." });
+    }
+    const quantity = (requested.get(item.product_id) || 0) + item.quantity;
+    if (quantity > 50) return response.status(400).json({ error: "A product quantity cannot exceed 50." });
+    requested.set(item.product_id, quantity);
+  }
+
+  const callbackUrl = process.env.PAYSTACK_CALLBACK_URL;
+  console.log({callbackUrl});
+  
+  if (!callbackUrl) {
+    const error = new Error("Set PAYSTACK_CALLBACK_URL in the server .env file.");
+    error.status = 503;
+    throw error;
+  }
+  getPaystackSecret();
+  try {
+    const callback = new URL(callbackUrl);
+    if (callback.protocol !== "https:" && !(callback.protocol === "http:" && callback.hostname === "localhost")) {
+      throw new Error("The callback URL must use HTTPS, except for localhost development.");
+    }
+  } catch (error) {
+    error.status = 503;
+    throw error;
+  }
+
+  const client = getSupabase();
+  const productRows = failOnError(await client.from("products")
+    .select("id,name,price")
+    .eq("is_available", true)
+    .in("id", [...requested.keys()]));
+  if (productRows.length !== requested.size) {
+    return response.status(400).json({ error: "One or more selected products are no longer available." });
+  }
+
+  const orderItems = productRows.map((product) => ({
+    product_id: product.id,
+    name: product.name,
+    quantity: requested.get(product.id),
+    unit_price: Number(product.price)
+  }));
+  const amountMinor = orderItems.reduce(
+    (sum, item) => sum + Math.round(item.unit_price * 100) * item.quantity,
+    0
+  );
+  if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) {
+    return response.status(400).json({ error: "The order total is invalid." });
+  }
+
+  const reference = `brew-${randomUUID()}`;
+  const order = failOnError(await client.from("orders").insert({
+    customer_name: customerName.trim(),
+    customer_email: customerEmail.trim().toLowerCase(),
+    items: orderItems,
+    total: amountMinor / 100,
+    payment_reference: reference,
+    payment_status: "pending"
+  }).select("id,total").single());
+
+  try {
+    const payment = await paystackRequest("/transaction/initialize", {
+      email: customerEmail.trim().toLowerCase(),
+      amount: amountMinor,
+      currency: "NGN",
+      reference,
+      callback_url: callbackUrl,
+      metadata: { order_id: order.id }
+    });
+    if (payment.reference !== reference || !payment.authorization_url) {
+      throw new Error("Paystack returned an invalid payment initialization response.");
+    }
+    return response.status(201).json({ authorization_url: payment.authorization_url });
+  } catch (error) {
+    failOnError(await client.from("orders")
+      .update({ payment_status: "failed" })
+      .eq("id", order.id)
+      .eq("payment_status", "pending"));
+    throw error;
+  }
+}
+
 function validProduct(input, partial = false) {
   const product = {};
   if (!partial || input.name !== undefined) {
@@ -100,39 +260,42 @@ app.get("/api/posts", async (request, response) => {
   response.json(data);
 });
 
-app.post("/api/orders", async (request, response) => {
-  const { customer_name: customerName, items } = request.body || {};
-  if (typeof customerName !== "string" || !customerName.trim() || customerName.length > 100) {
-    return response.status(400).json({ error: "Enter a customer name up to 100 characters." });
+app.post(["/api/payments/initialize", "/api/orders"], initializePayment);
+
+app.get("/api/payments/verify", async (request, response) => {
+  const reference = request.query.reference;
+  if (typeof reference !== "string" || reference.length > 100 || !/^brew-[\w-]+$/.test(reference)) {
+    return response.status(400).json({ error: "A valid payment reference is required." });
   }
-  if (!Array.isArray(items) || items.length < 1 || items.length > 30) {
-    return response.status(400).json({ error: "Your order must contain between 1 and 30 products." });
+  response.json(await verifyPaystackPayment(reference));
+});
+
+app.post("/api/payments/webhook", async (request, response) => {
+  const signature = request.get("x-paystack-signature") || "";
+  if (!Buffer.isBuffer(request.rawBody)) {
+    return response.status(400).json({ error: "A JSON webhook body is required." });
   }
-  const requested = new Map();
-  for (const item of items) {
-    if (!Number.isInteger(item.product_id) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 50) {
-      return response.status(400).json({ error: "An order item is invalid." });
+  const secret = getPaystackSecret();
+  const expected = createHmac("sha512", secret).update(request.rawBody).digest();
+  let received;
+  try {
+    received = Buffer.from(signature, "hex");
+  } catch {
+    return response.status(401).json({ error: "Invalid webhook signature." });
+  }
+  if (received.length !== expected.length || !timingSafeEqual(received, expected)) {
+    return response.status(401).json({ error: "Invalid webhook signature." });
+  }
+
+  if (request.body?.event === "charge.success") {
+    const reference = request.body.data?.reference;
+    if (typeof reference !== "string" || !/^brew-[\w-]+$/.test(reference)) {
+      return response.status(400).json({ error: "The payment reference is invalid." });
     }
-    requested.set(item.product_id, (requested.get(item.product_id) || 0) + item.quantity);
+    const result = await verifyPaystackPayment(reference);
+    if (!result.paid) return response.status(400).json({ error: "The payment has not been confirmed." });
   }
-  const client = getSupabase();
-  const productRows = failOnError(await client.from("products").select("id,name,price").eq("is_available", true).in("id", [...requested.keys()]));
-  if (productRows.length !== requested.size) {
-    return response.status(400).json({ error: "One or more selected products are no longer available." });
-  }
-  const orderItems = productRows.map((product) => ({
-    product_id: product.id,
-    name: product.name,
-    quantity: requested.get(product.id),
-    unit_price: Number(product.price)
-  }));
-  const total = orderItems.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
-  const order = failOnError(await client.from("orders").insert({
-    customer_name: customerName.trim(),
-    items: orderItems,
-    total
-  }).select("id,status,total").single());
-  response.status(201).json(order);
+  response.sendStatus(200);
 });
 
 app.use("/api/admin", requireAdmin);
@@ -166,12 +329,17 @@ app.get("/api/admin/orders", async (request, response) => {
 app.patch("/api/admin/orders/:id", async (request, response) => {
   const { status } = request.body || {};
   if (!statuses.includes(status)) return response.status(400).json({ error: "Choose a valid order status." });
-  const data = failOnError(await getSupabase().from("orders").update({ status }).eq("id", request.params.id).select().single());
+  const client = getSupabase();
+  const order = failOnError(await client.from("orders").select("payment_status").eq("id", request.params.id).single());
+  if (order.payment_status !== "paid") {
+    return response.status(409).json({ error: "Only verified paid orders can be processed." });
+  }
+  const data = failOnError(await client.from("orders").update({ status }).eq("id", request.params.id).select().single());
   response.json(data);
 });
 
 app.get("/api/admin/sales", async (request, response) => {
-  const orders = failOnError(await getSupabase().from("orders").select("id,total,status,created_at").neq("status", "cancelled").order("created_at", { ascending: false }));
+  const orders = failOnError(await getSupabase().from("orders").select("id,total,status,payment_status,created_at").eq("payment_status", "paid").neq("status", "cancelled").order("created_at", { ascending: false }));
   response.json({
     total: orders.reduce((sum, order) => sum + Number(order.total), 0),
     order_count: orders.length,

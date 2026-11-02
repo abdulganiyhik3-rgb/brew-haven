@@ -110,12 +110,15 @@ async function loadOrders() {
     row.className = "admin-order-row";
     const heading = document.createElement("strong");
     heading.textContent = `${order.customer_name} · ${money(order.total)}`;
+    const paymentStatus = document.createElement("span");
+    paymentStatus.textContent = `Payment: ${order.payment_status || "pending"}${order.customer_email ? ` · ${order.customer_email}` : ""}`;
     const date = document.createElement("span");
     date.textContent = new Date(order.created_at).toLocaleString();
     const itemList = document.createElement("p");
     itemList.textContent = order.items.map((item) => `${item.quantity} × ${item.name}`).join(", ");
     const status = document.createElement("select");
     status.dataset.id = order.id;
+    status.disabled = order.payment_status !== "paid";
     for (const value of ["new", "preparing", "ready", "completed", "cancelled"]) {
       const option = document.createElement("option");
       option.value = value;
@@ -123,7 +126,7 @@ async function loadOrders() {
       option.selected = order.status === value;
       status.append(option);
     }
-    row.append(heading, date, itemList, status);
+    row.append(heading, paymentStatus, date, itemList, status);
     ordersContainer.append(row);
   });
 }
@@ -138,7 +141,7 @@ async function loadSales() {
   }
   sales.orders.forEach((order) => {
     const row = document.createElement("p");
-    row.textContent = `Order #${order.id} · ${new Date(order.created_at).toLocaleDateString()} · ${order.status} · ${money(order.total)}`;
+    row.textContent = `Order #${order.id} · ${new Date(order.created_at).toLocaleDateString()} · ${order.status} · ${order.payment_status} · ${money(order.total)}`;
     salesContainer.append(row);
   });
 }
