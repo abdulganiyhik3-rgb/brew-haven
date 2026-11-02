@@ -9,11 +9,14 @@ const postsContainer = document.querySelector("#posts");
 const ordersContainer = document.querySelector("#orders");
 const salesContainer = document.querySelector("#sales");
 let adminKey = "";
+const apiBaseUrl = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
+  ? "http://localhost:3000"
+  : "";
 
 const money = (value) => new Intl.NumberFormat("en-US").format(value);
 
 async function request(path, options = {}) {
-  const response = await fetch(path, {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",

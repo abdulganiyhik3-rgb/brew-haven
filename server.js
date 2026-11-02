@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { pathToFileURL } from "node:url";
 import express from "express";
 import { createClient } from "@supabase/supabase-js";
 
@@ -143,8 +144,6 @@ async function initializePayment(request, response) {
   }
 
   const callbackUrl = process.env.PAYSTACK_CALLBACK_URL;
-  console.log({callbackUrl});
-  
   if (!callbackUrl) {
     const error = new Error("Set PAYSTACK_CALLBACK_URL in the server .env file.");
     error.status = 503;
@@ -249,6 +248,13 @@ function validPost(input) {
   if (typeof author !== "string" || !author.trim() || author.length > 100) return null;
   return { title: input.title.trim(), content: input.content.trim(), author: author.trim() };
 }
+
+app.get("/api/health", (request, response) => {
+  response.json({
+    success: true,
+    message: "Brew Haven API is running!"
+  });
+});
 
 app.get("/api/products", async (request, response) => {
   const data = failOnError(await getSupabase().from("products").select("id,name,description,image_url,price").eq("is_available", true).order("created_at"));
@@ -375,16 +381,27 @@ app.use((error, request, response, next) => {
   response.status(error.status || 500).json({ error: error.status === 503 ? error.message : "The request could not be completed. Check the server logs and database connection." });
 });
 
-app.use("/img", express.static("img"));
+export default app;
 
-const { createServer: createViteServer } = await import("vite");
-if (process.env.NODE_ENV === "production") {
-  app.use(express.static("dist"));
-} else {
-  const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
-  app.use(vite.middlewares);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const startServer = async () => {
+    app.use("/img", express.static("img"));
+
+    const { createServer: createViteServer } = await import("vite");
+    if (process.env.NODE_ENV === "production") {
+      app.use(express.static("dist"));
+    } else {
+      const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
+      app.use(vite.middlewares);
+    }
+
+    app.listen(port, () => {
+      console.log(`Brew Haven running at http://localhost:${port}`);
+    });
+  };
+
+  startServer().catch((error) => {
+    console.error("Brew Haven failed to start.", error);
+    process.exitCode = 1;
+  });
 }
-
-app.listen(port, () => {
-  console.log(`Brew Haven running at http://localhost:${port}`);
-});

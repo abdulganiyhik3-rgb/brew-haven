@@ -3,7 +3,9 @@ const navigation = document.querySelector("#primary-navigation");
 const menuItems = document.querySelector(".menu-items");
 const postsContainer = document.querySelector("#posts");
 const cartStorageKey = "brewHavenCart";
-const apiBaseUrl = "http://localhost:3000";
+const apiBaseUrl = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
+  ? "http://localhost:3000"
+  : "";
 const cart = new Map();
 let products = [];
 const confirmation = document.createElement("div");
