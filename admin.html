@@ -1,55 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Brew Haven Admin</title>
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brew Haven Admin</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="admin-page">
-<h1>Brew Haven Admin</h1>
-<form id="product-form">
-<input name="name" placeholder="Product name" required>
-<input name="description" placeholder="Description" required>
-<input name="image_url" placeholder="Image URL" required>
-<input name="price" type="number" min="0" placeholder="Price" required>
-<button type="submit">Add product</button>
-</form>
-<section>
-<h2>Products</h2>
-<div id="products"></div>
-</section>
-<section>
-<h2>Orders</h2>
-<div id="orders"></div>
-</section>
-</main>
-<script type="module">
-import { supabase } from "./supabase-client.js";
-const productForm = document.querySelector("#product-form");
-const products = document.querySelector("#products");
-const orders = document.querySelector("#orders");
-const load = async () => {
-  const [{ data: productRows }, { data: orderRows }] = await Promise.all([
-    supabase.from("products").select("id,name,description,image_url,price,is_available").order("created_at", { ascending: false }),
-    supabase.from("orders").select("id,customer_name,total,status,created_at").order("created_at", { ascending: false })
-  ]);
-  products.replaceChildren(...(productRows || []).map((product) => {
-    const row = document.createElement("div");
-    row.innerHTML = `<strong>${product.name}</strong><span>${product.price}</span><button data-id="${product.id}">${product.is_available ? "Hide" : "Show"}</button>`;
-    row.querySelector("button").onclick = async () => { await supabase.from("products").update({ is_available: !product.is_available }).eq("id", product.id); load(); };
-    return row;
-  }));
-  orders.replaceChildren(...(orderRows || []).map((order) => {
-    const row = document.createElement("div");
-    row.innerHTML = `<strong>${order.customer_name}</strong><span>${order.total}</span><select><option ${order.status === "new" ? "selected" : ""}>new</option><option ${order.status === "preparing" ? "selected" : ""}>preparing</option><option ${order.status === "ready" ? "selected" : ""}>ready</option><option ${order.status === "completed" ? "selected" : ""}>completed</option><option ${order.status === "cancelled" ? "selected" : ""}>cancelled</option></select>`;
-    row.querySelector("select").onchange = async (event) => { await supabase.from("orders").update({ status: event.target.value }).eq("id", order.id); };
-    return row;
-  }));
-};
-productForm.onsubmit = async (event) => { event.preventDefault(); const form = new FormData(productForm); await supabase.from("products").insert({ name: form.get("name"), description: form.get("description"), image_url: form.get("image_url"), price: Number(form.get("price")) }); productForm.reset(); load(); };
-load();
-</script>
+    <header>
+        <div class="logo-wrapper">
+            <h2 class="logo-name">Brew Haven</h2>
+            <img class="logo" src="./img/coffee.png" alt="Brew Haven">
+        </div>
+        <a class="admin-home-link" href="/">View website</a>
+    </header>
+    <main class="admin-page">
+        <h1>Brew Haven Admin</h1>
+        <form id="admin-access">
+            <label for="admin-key">Admin key</label>
+            <input id="admin-key" name="admin_key" type="password" autocomplete="current-password" required>
+            <button type="submit">Continue</button>
+        </form>
+        <p id="admin-message" role="status" aria-live="polite"></p>
+        <div id="admin-dashboard" hidden>
+            <section>
+                <h2>Sales</h2>
+                <p id="sales-summary"></p>
+                <div id="sales"></div>
+            </section>
+            <section>
+                <h2>Products and prices</h2>
+                <form id="product-form" class="admin-form">
+                    <input name="name" maxlength="100" placeholder="Product name" required>
+                    <input name="description" maxlength="1000" placeholder="Description" required>
+                    <input name="image_url" maxlength="500" placeholder="Image URL" required>
+                    <input name="price" type="number" min="0" step="0.01" placeholder="Price" required>
+                    <button type="submit">Add product</button>
+                </form>
+                <div id="products" class="admin-list"></div>
+            </section>
+            <section>
+                <h2>Posts</h2>
+                <form id="post-form" class="admin-form">
+                    <input name="title" maxlength="150" placeholder="Post title" required>
+                    <input name="author" maxlength="100" placeholder="Author" value="Brew Haven" required>
+                    <textarea name="content" maxlength="5000" placeholder="Post content" required></textarea>
+                    <button type="submit">Publish post</button>
+                </form>
+                <div id="posts" class="admin-list"></div>
+            </section>
+            <section>
+                <h2>Orders</h2>
+                <div id="orders" class="admin-list"></div>
+            </section>
+        </div>
+    </main>
+    <script type="module" src="admin.js"></script>
 </body>
 </html>

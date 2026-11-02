@@ -31,7 +31,13 @@
 
             <a href="#reviews">Reviews</a>
         </nav>
-        <button>Order Now</button>
+        <button class="cart-button" type="button" aria-label="Open shopping cart">
+            <svg class="cart-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 8h14l1 13H4L5 8Z"></path>
+                <path d="M9 9V6a3 3 0 0 1 6 0v3"></path>
+            </svg>
+            <span class="cart-count" aria-live="polite">0</span>
+        </button>
     </header>
     <section class="hero" id="home">
         <div class="hero-text">
@@ -41,7 +47,7 @@
                 Enjoy freshly brewed coffe,delicious treat,
                 and a cozy atmophere made four you.
             </p>
-            <button>Explore our menu</button>
+            <button type="button" onclick="document.querySelector('#menu').scrollIntoView({ behavior: 'smooth' })">Explore our menu</button>
         </div>
         <div class="hero-image">
             <img src="img/coffee.jpg" alt="A freshly brewed cup of coffee">
@@ -54,54 +60,7 @@
         <p class="menu-description">
             Discover your favourite coffee and treats - All in one place.
         </p>
-        <div class="menu-items">
-            <div class="menu-card">
-                <img src="img/cappuccino.png" alt="cappuccino coffee">
-                <h3>Cappuccino</h3>
-                <p>Smooth coffe topped with milk foam.</p>
-                <button class="add-to-cart" data-name="cappuccino" data-price="3000">Add to Cart</button>
-                <span>3,000</span>
-            </div>
-            <div class="menu-card">
-                <img src="img/espresso.png" alt="Espresso coffe">
-                <h3>Espresso</h3>
-                <p>Rich and bold coffee with smooth finish.</p>
-                <button class="add-to-cart" data-name="espresso" data-price="3500">Add to Cart</button>
-                <span>3,500</span>
-            </div>
-            <div class="menu-card">
-                <img src="img/icedcoffee.png" alt="Iced coffee">
-                <h3>Iced coffee</h3>
-                <p>Refreshing coffee served cold.</p>
-                <button class="add-to-cart" data-name="icedcoffee" data-price="3500">Add to cart</button>
-                <span>3,500</span>
-            </div>
-            <div class="menu-card">
-                <img src="img/latte.png" alt="Latte coffee">
-                <h3>Latte coffee</h3>
-                <p>Creamy,smooth and full of flavour.</p>
-                <button class="add-to-cart" data-name="latte" data-price="3500">Add to Cart</button>
-                <span>3,500</span>
-            </div>
-            <div class="menu-card">
-                <img src="img/caramelfrappe.png" alt="Caramel frappe coffee">
-                <h3>Caramel frappe</h3>
-                <p>Chilled,creamy and naturally sweet.</p>
-                <button class="add-to-cart" data-name="caramelfrappe" data-price="4000">Add to Cart</button>
-                <span>4,000</span>
-            </div>
-            <div class="menu-card">
-                <img src="img/flatwhite.png" alt="flatwhite coffee">
-                <h3>Flat white coffee</h3>
-                <p>Creamy made witha double shot of espresso.</p>
-                <button class="add-to-cart" data-name="flatwhite" data-price="4000">Add to Cart</button>
-                <span>4,000</span>
-            </div>
-
-
-
-
-        </div>
+        <div class="menu-items" aria-live="polite"></div>
         <div class="menu-footer">
             <div class="menu-footer-decoration">
                 <span></span>
@@ -120,34 +79,10 @@
                     <p class="section-label">Testimonials</p>
                     <h2>What they say</h2>
                 </div>
-                <p class="reviews-text">Hear What our lovely guest have to say about their experience at Brew Haven.</p>
+                <p class="reviews-text">News and updates from Brew Haven.</p>
             </div>
             <div class="reviews-content">
-                <div class="reviews-list">
-                    <div class="review-top">
-                        <div>
-                            <h3>Lylia</h3>
-                            <p class="stars">*****</p>
-                            <p class="review-text">
-                                Brew Haven has quickly become my go-to place for both work
-                                and relaxation. The cozy atmophere,paired with the soothing music and
-                                perfectly brewed coffee.
-                            </p>
-                        </div>
-
-                    </div>
-                    <div class="review-second">
-                        <div>
-                            <h3>Aurora</h3>
-                            <p class="stars">*****</p>
-                            <p class="review-text">
-                                Every time i walked into Brew Haven,i`m greeted with the comforting aroma of freshly
-                                brewed coffee
-                                and a warm smile from the staff.
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                <div class="reviews-list" id="posts" aria-live="polite"></div>
                 <div class="reviews-image">
                     <img src="img/coffeepic.jpg" alt="A fresh coffee">
 
