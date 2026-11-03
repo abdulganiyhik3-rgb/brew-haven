@@ -1,11 +1,10 @@
+import { apiUrl, supabaseApiKey } from "./supabase-client.js";
+
 const menuToggle = document.querySelector(".menu-toggle");
 const navigation = document.querySelector("#primary-navigation");
 const menuItems = document.querySelector(".menu-items");
 const postsContainer = document.querySelector("#posts");
 const cartStorageKey = "brewHavenCart";
-const apiBaseUrl = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
-  ? "http://localhost:3000"
-  : "";
 const cart = new Map();
 let products = [];
 const confirmation = document.createElement("div");
@@ -18,7 +17,14 @@ let confirmationTimer;
 const money = (value) => new Intl.NumberFormat("en-US").format(value);
 
 async function request(path, options) {
-  const response = await fetch(`${apiBaseUrl}${path}`, options);
+  const response = await fetch(apiUrl(path), {
+    ...options,
+    headers: {
+      apikey: supabaseApiKey,
+      Authorization: `Bearer ${supabaseApiKey}`,
+      ...options?.headers
+    }
+  });
   const result = response.status === 204 ? null : await response.json();
   if (!response.ok) throw new Error(result?.error || "The request could not be completed.");
   return result;

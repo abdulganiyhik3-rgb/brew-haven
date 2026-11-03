@@ -1,0 +1,16 @@
+project_id = "brew-haven"
+
+[functions.health]
+verify_jwt = false
+
+[functions.products]
+verify_jwt = false
+
+[functions.posts]
+verify_jwt = false
+
+[functions.payments]
+verify_jwt = false
+
+[functions.orders]
+verify_jwt = false

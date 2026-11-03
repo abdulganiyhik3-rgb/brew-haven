@@ -890,23 +890,66 @@ body.cart-open {
     }
 }
 
+/* Testimonials cards */
 .review-post {
-    padding: 16px;
+    position: relative;
+    padding: 18px;
     border: 1px solid #eee4dc;
+    background-color: #fff6ed;
     color: #4b2e20;
+    min-height: 145px;
+}
+
+.review-post:first-child {
+    background-color: #3d2929;
+    color: #fffaf5;
 }
 
 .review-post h3 {
-    margin-top: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0 0 12px;
+    font-size: 17px;
 }
 
-.review-text {
-    line-height: 1.6;
+/* Circular profile icons */
+.review-post h3::after {
+    content: "";
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background-color: #d8c2aa;
+    color: #4b2e20;
 }
 
-.post-author {
-    color: #8b5e3c;
-    font-size: 14px;
+.review-post:first-child h3::after {
+    content: "L";
+}
+
+.review-post:nth-child(2) h3::after {
+    content: "A";
+    background-color: #e4d4c1;
+}
+
+.review-post .review-text {
+    font-size: 12px;
+    line-height: 1.7;
+    margin: 20px 0 0;
+}
+
+.review-post .post-author {
+    color: #b89575;
+    font-size: 13px;
+    letter-spacing: 2px;
+    margin: 0;
+}
+
+.review-post:first-child .post-author {
+    color: #fffaf5;
 }
 
 .admin-page {

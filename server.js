@@ -22,7 +22,7 @@ app.use((request, response, next) => {
   if (origin === "http://localhost:5500") {
     response.set("Access-Control-Allow-Origin", origin);
     response.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
-    response.set("Access-Control-Allow-Headers", "Content-Type, X-Admin-Key");
+    response.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   }
 
   if (request.method === "OPTIONS") return response.sendStatus(204);
@@ -39,16 +39,33 @@ function getSupabase() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-function requireAdmin(request, response, next) {
-  const configuredKey = process.env.ADMIN_KEY;
-  const suppliedKey = request.get("x-admin-key") || "";
-  if (!configuredKey || configuredKey.startsWith("replace-with-")) {
-    return response.status(503).json({ error: "Set ADMIN_KEY in .env before using admin operations." });
+async function requireAdmin(request, response, next) {
+  const allowedEmails = (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  if (!allowedEmails.length) {
+    return response.status(503).json({ error: "Set ADMIN_EMAILS in .env before using admin operations." });
   }
-  const supplied = Buffer.from(suppliedKey);
-  const expected = Buffer.from(configuredKey);
-  if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
-    return response.status(401).json({ error: "Admin key is invalid." });
+
+  const authorization = request.get("authorization") || "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  if (!token) return response.status(401).json({ error: "Sign in with an admin account to continue." });
+
+  const { SUPABASE_URL: url, SUPABASE_ANON_KEY: key } = process.env;
+  if (!url || !key) {
+    return response.status(503).json({ error: "Supabase Auth configuration is incomplete." });
+  }
+
+  const authClient = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+  const { data, error } = await authClient.auth.getUser(token);
+  if (error || !data.user) {
+    return response.status(401).json({ error: "Your session is invalid or has expired. Sign in again." });
+  }
+  if (!data.user.email || !allowedEmails.includes(data.user.email.toLowerCase())) {
+    return response.status(403).json({ error: "This account is not authorized to use the admin dashboard." });
   }
   next();
 }

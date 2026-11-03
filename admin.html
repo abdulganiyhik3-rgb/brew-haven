@@ -17,12 +17,15 @@
     <main class="admin-page">
         <h1>Brew Haven Admin</h1>
         <form id="admin-access">
-            <label for="admin-key">Admin key</label>
-            <input id="admin-key" name="admin_key" type="password" autocomplete="current-password" required>
-            <button type="submit">Continue</button>
+            <label for="admin-email">Admin email</label>
+            <input id="admin-email" name="email" type="email" autocomplete="username" required>
+            <label for="admin-password">Password</label>
+            <input id="admin-password" name="password" type="password" autocomplete="current-password" required>
+            <button type="submit">Sign in</button>
         </form>
         <p id="admin-message" role="status" aria-live="polite"></p>
         <div id="admin-dashboard" hidden>
+            <button id="admin-sign-out" type="button">Sign out</button>
             <section>
                 <h2>Sales</h2>
                 <p id="sales-summary"></p>

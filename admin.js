@@ -1,26 +1,30 @@
+import { apiUrl, supabase, supabaseApiKey } from "./supabase-client.js";
+
 const accessForm = document.querySelector("#admin-access");
-const keyInput = accessForm.elements.admin_key;
 const dashboard = document.querySelector("#admin-dashboard");
 const message = document.querySelector("#admin-message");
+const signOutButton = document.querySelector("#admin-sign-out");
 const productForm = document.querySelector("#product-form");
 const postForm = document.querySelector("#post-form");
 const productsContainer = document.querySelector("#products");
 const postsContainer = document.querySelector("#posts");
 const ordersContainer = document.querySelector("#orders");
 const salesContainer = document.querySelector("#sales");
-let adminKey = "";
-const apiBaseUrl = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
-  ? "http://localhost:3000"
-  : "";
 
 const money = (value) => new Intl.NumberFormat("en-US").format(value);
 
 async function request(path, options = {}) {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  const accessToken = data.session?.access_token;
+  if (!accessToken) throw new Error("Sign in with an admin account to continue.");
+
+  const response = await fetch(apiUrl(path), {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      "x-admin-key": adminKey,
+      apikey: supabaseApiKey,
+      Authorization: `Bearer ${accessToken}`,
       ...options.headers
     }
   });
@@ -157,18 +161,52 @@ async function loadDashboard() {
 
 accessForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  adminKey = keyInput.value;
   message.textContent = "";
+  try {
+    const formData = new FormData(accessForm);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: formData.get("email"),
+      password: formData.get("password")
+    });
+    if (error) throw error;
+    await loadDashboard();
+    dashboard.hidden = false;
+    accessForm.hidden = true;
+  } catch (error) {
+    const { error: signOutError } = await supabase.auth.signOut();
+    showError(signOutError || error);
+  }
+});
+
+signOutButton.addEventListener("click", async () => {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    showError(error);
+    return;
+  }
+  dashboard.hidden = true;
+  accessForm.hidden = false;
+  accessForm.reset();
+  message.textContent = "";
+});
+
+async function restoreAdminSession() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    showError(error);
+    return;
+  }
+  if (!data.session) return;
+
   try {
     await loadDashboard();
     dashboard.hidden = false;
     accessForm.hidden = true;
   } catch (error) {
-    adminKey = "";
-    keyInput.value = "";
-    showError(error);
+    const { error: signOutError } = await supabase.auth.signOut();
+    showError(signOutError || error);
   }
-});
+}
 
 productForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -252,3 +290,5 @@ ordersContainer.addEventListener("change", async (event) => {
     showError(error);
   }
 });
+
+restoreAdminSession();
