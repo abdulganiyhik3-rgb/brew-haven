@@ -75,7 +75,7 @@ async function requireAdmin(request: Request): Promise<void> {
 Deno.serve(async (request: Request): Promise<Response> => {
   const headers = corsHeaders(request);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
-  const path = new URL(request.url).pathname.replace(/^\/functions\/v1\/orders/, "") || "/";
+  const path = new URL(request.url).pathname.replace(/^\/orders/, "") || "/";
   const method = request.method.toUpperCase();
   try {
     if (!path.startsWith("/admin")) throw new HttpError(404, "API endpoint not found.");

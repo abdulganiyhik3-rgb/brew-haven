@@ -1,6 +1,7 @@
 import { apiUrl, supabase, supabaseApiKey } from "./supabase-client.js";
 
 const accessForm = document.querySelector("#admin-access");
+const forgotPasswordButton = document.querySelector("#admin-forgot-password");
 const dashboard = document.querySelector("#admin-dashboard");
 const message = document.querySelector("#admin-message");
 const signOutButton = document.querySelector("#admin-sign-out");
@@ -168,13 +169,42 @@ accessForm.addEventListener("submit", async (event) => {
       email: formData.get("email"),
       password: formData.get("password")
     });
-    if (error) throw error;
+    if (error) {
+      showError(error);
+      return;
+    }
+  } catch (error) {
+    showError(error);
+    return;
+  }
+
+  try {
     await loadDashboard();
     dashboard.hidden = false;
     accessForm.hidden = true;
   } catch (error) {
-    const { error: signOutError } = await supabase.auth.signOut();
-    showError(signOutError || error);
+    showError(error);
+  }
+});
+
+forgotPasswordButton.addEventListener("click", async () => {
+  const emailInput = accessForm.elements.email;
+  if (!emailInput.checkValidity()) {
+    emailInput.reportValidity();
+    return;
+  }
+
+  message.textContent = "";
+  forgotPasswordButton.disabled = true;
+  try {
+    const redirectTo = new URL("/admin-reset.html?recovery=1", window.location.origin).href;
+    const { error } = await supabase.auth.resetPasswordForEmail(emailInput.value, { redirectTo });
+    if (error) throw error;
+    message.textContent = "If an admin account exists for that email, a password reset link has been sent.";
+  } catch (error) {
+    showError(error);
+  } finally {
+    forgotPasswordButton.disabled = false;
   }
 });
 
@@ -203,8 +233,7 @@ async function restoreAdminSession() {
     dashboard.hidden = false;
     accessForm.hidden = true;
   } catch (error) {
-    const { error: signOutError } = await supabase.auth.signOut();
-    showError(signOutError || error);
+    showError(error);
   }
 }
 

@@ -851,6 +851,10 @@ body.cart-open {
     margin-bottom: 16px;
 }
 
+.admin-form[hidden] {
+    display: none;
+}
+
 .admin-page label {
     color: #4b2e20;
 }

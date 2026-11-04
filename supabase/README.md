@@ -1,10 +1,10 @@
 # Supabase backend setup
 
-Brew Haven uses Supabase Auth for admin sign-in and separate, self-contained
-Edge Functions for health, products, posts, payments, and orders. Each
-function's `index.ts` can be pasted by itself into the Supabase Dashboard
-editor; it has no imports from local project files. The existing Express API
-remains available for local development.
+Brew Haven uses Supabase Auth and Supabase Edge Functions for health, products,
+posts, payments, and orders in both development and production. The local
+Express/Vite server only serves the website; API requests always go to the
+configured Supabase project. Each function's `index.ts` is self-contained and
+can be pasted into the Supabase Dashboard editor.
 
 ## Configure the project
 
@@ -13,8 +13,12 @@ remains available for local development.
 2. Set `ADMIN_EMAILS` to the comma-separated, lowercase email addresses allowed
    to use the dashboard. An authenticated account not on this list cannot access
    admin API routes.
-3. Configure the Supabase Auth site URL and redirect URL for the deployed
-   website, plus localhost URLs used during development.
+3. In Supabase **Authentication → URL Configuration**, set the Site URL to
+   your production website URL. Add the admin Vercel deployment's exact origin
+   plus `/admin-reset.html?recovery=1` to the Redirect URLs allowlist. Add
+   localhost reset URLs for development if needed. If using Vercel Preview
+   deployments, allow their exact reset URLs or a narrowly scoped preview
+   domain pattern supported by Supabase.
 4. Create five Edge Functions named `health`, `products`, `posts`, `payments`,
    and `orders`. For Dashboard deployment, paste the contents of the matching
    `supabase/functions/<name>/index.ts` into that function's `index.ts` editor
@@ -35,8 +39,12 @@ remains available for local development.
    supabase functions deploy orders
    ```
 
-5. In Vercel, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to the
-   project's URL and public anon/publishable key, then rebuild the site.
+5. In each Vercel project (main website and admin deployment), set
+   `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to the same Supabase
+   project URL and public anon/publishable key, then rebuild each deployment.
+   Keep project-specific values scoped to the appropriate Vercel project and
+   environment. Never expose `SUPABASE_SERVICE_ROLE_KEY` or other server
+   secrets in `VITE_` variables or browser code.
 6. Configure these Edge Function secrets in Supabase:
 
    ```text
@@ -54,13 +62,26 @@ remains available for local development.
 7. In Paystack, configure the webhook URL as
    `https://<project-ref>.supabase.co/functions/v1/payments/webhook`.
 
-For local development, set `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
-`SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAILS`, and the Paystack settings in the
-ignored root `.env` file. Set the two `VITE_` variables there as well for the
-browser client. `npm run dev` continues to run the Express API and Vite site.
+The password-reset email must use Supabase's `{{ .ConfirmationURL }}` link so
+the requested redirect URL is preserved. If a link redirects to the site root
+instead of `/admin-reset.html`, verify that the exact reset URL is in
+**Authentication → URL Configuration → Redirect URLs** and that the email
+template uses `{{ .ConfirmationURL }}`. Reset links are single-use and expire;
+if a link reports `otp_expired`, request a new one and open the newest email
+once. If even new links expire immediately, check the project email provider,
+mail scanner/link-preview behavior, and the expiry value in
+**Authentication → Providers → Email**.
+
+For local development, set `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` in the ignored root `.env` file, then run `npm run
+dev`. The local site calls the same Supabase Edge Functions and uses the same
+Supabase Auth, database, and Edge Function secrets as production. Do not put
+the service-role key, admin allowlist, or Paystack secrets in the local
+frontend environment; configure them only as Supabase Edge Function secrets.
+`npm start` serves the production build from `dist`.
 
 Admin product, post, and order functions validate access against Supabase Auth
 on every admin API request. Public catalog and payment routes do not require an
-admin session. Database access and Paystack secrets remain server-side; product
+admin session. Database access and Paystack secrets remain in Supabase; product
 image URLs and the current database tables and records are unchanged; no
 migration is required.

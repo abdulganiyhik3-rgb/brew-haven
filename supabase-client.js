@@ -7,13 +7,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before using the website.");
 }
 
-const localHosts = ["localhost", "127.0.0.1", "[::1]"];
-const isLocal = localHosts.includes(window.location.hostname);
-const localApiBaseUrl = window.location.port === "3000" ? "" : "http://localhost:3000";
-
 export function apiUrl(path) {
-  if (isLocal) return `${localApiBaseUrl}${path}`;
-
   const url = new URL(path, window.location.origin);
   const pathname = url.pathname;
   const adminResource = pathname.match(/^\/api\/admin\/(products|posts|orders)(\/.*)?$/);

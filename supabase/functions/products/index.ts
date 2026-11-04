@@ -101,7 +101,7 @@ function validProduct(input: Record<string, unknown>, partial = false) {
 Deno.serve(async (request: Request): Promise<Response> => {
   const headers = corsHeaders(request);
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
-  const path = new URL(request.url).pathname.replace(/^\/functions\/v1\/products/, "") || "/";
+  const path = new URL(request.url).pathname.replace(/^\/products/, "") || "/";
   const method = request.method.toUpperCase();
   try {
     if (method === "GET" && path === "/") {

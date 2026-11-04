@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Admin Password | Brew Haven</title>
+    <link rel="icon" type="image/png" href="/img/coffe-logo.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="logo-wrapper">
+            <h2 class="logo-name">Brew Haven</h2>
+            <img class="logo" src="./img/coffee.png" alt="Brew Haven">
+        </div>
+        <a class="admin-home-link" href="/admin.html">Back to admin</a>
+    </header>
+    <main class="admin-page">
+        <h1>Set a new admin password</h1>
+        <form id="admin-password-reset" class="admin-form" hidden>
+            <label for="new-password">New password</label>
+            <input id="new-password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+            <label for="confirm-password">Confirm new password</label>
+            <input id="confirm-password" name="password-confirmation" type="password" autocomplete="new-password" minlength="8" required>
+            <button id="admin-password-reset-submit" type="submit">Update password</button>
+        </form>
+        <p id="admin-reset-message" role="status" aria-live="polite"></p>
+    </main>
+    <script type="module" src="admin-reset.js"></script>
+</body>
+</html>
